@@ -1,0 +1,153 @@
+##[[
+linklib 'aria'
+cinclude '<aria.h>'
+]]
+
+global __jmp_buf_tag: type <cimport,nodecl,aligned(8),cincomplete,ctypedef> = @record{
+  __jmpbuf: [64]cint,
+  __mask_was_saved: cint,
+}
+global ar_Value: type <cimport,nodecl,forwarddecl> = @record{}
+global ar_State: type <cimport,nodecl,forwarddecl> = @record{}
+global ar_Chunk: type <cimport,nodecl,forwarddecl> = @record{}
+global ar_Frame: type <cimport,nodecl,forwarddecl> = @record{}
+global ar_Alloc: type <cimport,nodecl> = @function(pointer, pointer, csize): pointer
+global ar_CFunc: type <cimport,nodecl> = @function(*ar_State, *ar_Value): *ar_Value
+global ar_Prim: type <cimport,nodecl> = @function(*ar_State, *ar_Value, *ar_Value): *ar_Value
+ar_Value = @record{
+  type: cuchar,
+  mark: cuchar,
+  u: union{
+    dbg: record{
+      name: *ar_Value,
+      line: cint
+    },
+    map: record{
+      pair: *ar_Value,
+      left: *ar_Value,
+      right: *ar_Value
+    },
+    pair: record{
+      car: *ar_Value,
+      cdr: *ar_Value,
+      dbg: *ar_Value
+    },
+    num: record{
+      n: float64
+    },
+    func: record{
+      params: *ar_Value,
+      body: *ar_Value,
+      env: *ar_Value
+    },
+    udata: record{
+      ptr: pointer,
+      gc: ar_CFunc,
+      mark: ar_CFunc
+    },
+    env: record{
+      parent: *ar_Value,
+      map: *ar_Value
+    },
+    cfunc: record{
+      fn: ar_CFunc
+    },
+    prim: record{
+      fn: ar_Prim
+    },
+    str: record{
+      s: cstring,
+      len: csize,
+      hash: cuint
+    }
+  }
+}
+ar_Frame = @record{
+  parent: *ar_Frame,
+  caller: *ar_Value,
+  err_env: *[1]__jmp_buf_tag,
+  stack_idx: cint
+}
+ar_State = @record{
+  alloc: ar_Alloc,
+  udata: pointer,
+  Global: *ar_Value,
+  base_frame: ar_Frame,
+  frame: *ar_Frame,
+  frame_idx: cint,
+  t: *ar_Value,
+  panic: ar_CFunc,
+  err_args: *ar_Value,
+  oom_error: *ar_Value,
+  oom_args: *ar_Value,
+  parse_name: *ar_Value,
+  parse_line: cint,
+  gc_stack: **ar_Value,
+  gc_stack_idx: cint,
+  gc_stack_cap: cint,
+  gc_chunks: *ar_Chunk,
+  gc_pool: *ar_Value,
+  gc_count: cint
+}
+global AR_TNIL: cint <comptime> = 0
+global AR_TDBGINFO: cint <comptime> = 1
+global AR_TMAPNODE: cint <comptime> = 2
+global AR_TPAIR: cint <comptime> = 3
+global AR_TNUMBER: cint <comptime> = 4
+global AR_TSTRING: cint <comptime> = 5
+global AR_TSYMBOL: cint <comptime> = 6
+global AR_TFUNC: cint <comptime> = 7
+global AR_TMACRO: cint <comptime> = 8
+global AR_TPRIM: cint <comptime> = 9
+global AR_TCFUNC: cint <comptime> = 10
+global AR_TENV: cint <comptime> = 11
+global AR_TUDATA: cint <comptime> = 12
+global function ar_new_state(alloc: ar_Alloc, udata: pointer): *ar_State <cimport,nodecl> end
+global function ar_close_state(S: *ar_State): void <cimport,nodecl> end
+global function ar_at_panic(S: *ar_State, fn: ar_CFunc): ar_CFunc <cimport,nodecl> end
+global function ar_error(S: *ar_State, err: *ar_Value): void <cimport,nodecl> end
+global function ar_error_str(S: *ar_State, fmt: cstring, ...: cvarargs): void <cimport,nodecl> end
+global function ar_new_env(S: *ar_State, parent: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_new_pair(S: *ar_State, car: *ar_Value, cdr: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_new_list(S: *ar_State, n: csize, ...: cvarargs): *ar_Value <cimport,nodecl> end
+global function ar_new_number(S: *ar_State, n: float64): *ar_Value <cimport,nodecl> end
+global function ar_new_udata(S: *ar_State, ptr: pointer, gc: ar_CFunc, mark: ar_CFunc): *ar_Value <cimport,nodecl> end
+global function ar_new_stringl(S: *ar_State, str: cstring, len: csize): *ar_Value <cimport,nodecl> end
+global function ar_new_string(S: *ar_State, str: cstring): *ar_Value <cimport,nodecl> end
+global function ar_new_symbol(S: *ar_State, name: cstring): *ar_Value <cimport,nodecl> end
+global function ar_new_cfunc(S: *ar_State, fn: ar_CFunc): *ar_Value <cimport,nodecl> end
+global function ar_new_prim(S: *ar_State, fn: ar_Prim): *ar_Value <cimport,nodecl> end
+global function ar_type(v: *ar_Value): cint <cimport,nodecl> end
+global function ar_type_str(type: cint): cstring <cimport,nodecl> end
+global function ar_check(S: *ar_State, v: *ar_Value, type: cint): *ar_Value <cimport,nodecl> end
+global function ar_car(v: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_cdr(v: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_nth(v: *ar_Value, idx: cint): *ar_Value <cimport,nodecl> end
+global function ar_append_tail(S: *ar_State, last: **ar_Value, v: *ar_Value): **ar_Value <cimport,nodecl> end
+global function ar_to_string_value(S: *ar_State, v: *ar_Value, quotestr: cint): *ar_Value <cimport,nodecl> end
+global function ar_to_stringl(S: *ar_State, v: *ar_Value, len: *csize): cstring <cimport,nodecl> end
+global function ar_to_string(S: *ar_State, v: *ar_Value): cstring <cimport,nodecl> end
+global function ar_to_udata(S: *ar_State, v: *ar_Value): pointer <cimport,nodecl> end
+global function ar_to_number(S: *ar_State, v: *ar_Value): float64 <cimport,nodecl> end
+global function ar_opt_string(S: *ar_State, v: *ar_Value, def: cstring): cstring <cimport,nodecl> end
+global function ar_opt_udata(S: *ar_State, v: *ar_Value, def: pointer): pointer <cimport,nodecl> end
+global function ar_opt_number(S: *ar_State, v: *ar_Value, def: float64): float64 <cimport,nodecl> end
+global function ar_bind(S: *ar_State, sym: *ar_Value, v: *ar_Value, env: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_set(S: *ar_State, sym: *ar_Value, v: *ar_Value, env: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_mark(S: *ar_State, v: *ar_Value): void <cimport,nodecl> end
+global function ar_gc(S: *ar_State): void <cimport,nodecl> end
+global function ar_parse(S: *ar_State, str: cstring, name: cstring): *ar_Value <cimport,nodecl> end
+global function ar_eval(S: *ar_State, v: *ar_Value, env: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_call(S: *ar_State, fn: *ar_Value, args: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_do_list(S: *ar_State, body: *ar_Value, env: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_do_string(S: *ar_State, str: cstring): *ar_Value <cimport,nodecl> end
+global function ar_do_file(S: *ar_State, filename: cstring): *ar_Value <cimport,nodecl> end
+
+-- macros
+global AR_VERSION: string <cimport,nodecl>
+global function ar_get_global(S: *ar_State, x: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_bind_global(S: *ar_State, x: *ar_Value, v: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_call_global(S: *ar_State, f: *ar_Value, a: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_check_string(S: *ar_State, v: *ar_Value): cstring <cimport,nodecl> end
+global function ar_check_udata(S: *ar_State, v: *ar_Value): *void <cimport,nodecl> end
+global function ar_check_number(S: *ar_State, v: *ar_Value): float64 <cimport,nodecl>end

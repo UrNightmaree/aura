@@ -1,0 +1,6 @@
+require "arg"
+require "extra.aria"
+
+local state = ar_new_state(nilptr, nilptr)
+
+if #arg < 1 then

@@ -1,0 +1,6 @@
+require "string"
+
+global ansi = @record{}
+
+global ansi.BLACK <comptime> = 0
+global ansi.RED <comptime> = 1
