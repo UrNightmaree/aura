@@ -1,12 +1,18 @@
 ##[[
-linklib 'aria'
-cinclude '<aria.h>'
+if STATIC_ARIA or STATIC_ALL then
+    cflags "-Ideps/aria deps/aria/aria.c"
+else
+    linklib "aria"
+end
+cinclude "<aria.h>"
 ]]
 
+global jmp_buf = @void
 global __jmp_buf_tag: type <cimport,nodecl,aligned(8),cincomplete,ctypedef> = @record{
   __jmpbuf: [64]cint,
   __mask_was_saved: cint,
 }
+global function setjmp(env: *__jmp_buf_tag): cint <cimport,nodecl> end
 global ar_Value: type <cimport,nodecl,forwarddecl> = @record{}
 global ar_State: type <cimport,nodecl,forwarddecl> = @record{}
 global ar_Chunk: type <cimport,nodecl,forwarddecl> = @record{}
@@ -144,10 +150,25 @@ global function ar_do_string(S: *ar_State, str: cstring): *ar_Value <cimport,nod
 global function ar_do_file(S: *ar_State, filename: cstring): *ar_Value <cimport,nodecl> end
 
 -- macros
-global AR_VERSION: string <cimport,nodecl>
+global AR_VERSION: cstring <cimport,nodecl>
 global function ar_get_global(S: *ar_State, x: *ar_Value): *ar_Value <cimport,nodecl> end
-global function ar_bind_global(S: *ar_State, x: *ar_Value, v: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_bind_global(S: *ar_State, x: cstring, v: *ar_Value): *ar_Value <cimport,nodecl> end
 global function ar_call_global(S: *ar_State, f: *ar_Value, a: *ar_Value): *ar_Value <cimport,nodecl> end
 global function ar_check_string(S: *ar_State, v: *ar_Value): cstring <cimport,nodecl> end
 global function ar_check_udata(S: *ar_State, v: *ar_Value): *void <cimport,nodecl> end
 global function ar_check_number(S: *ar_State, v: *ar_Value): float64 <cimport,nodecl>end
+## function ar_try(state, err_args, err_blk, blk)
+    repeat
+        local old_env__: *[1]__jmp_buf_tag = #|state|#.frame.err_env
+        local err_env__: __jmp_buf_tag
+        #|state|#.frame.err_env = (@*[1]__jmp_buf_tag)(&err_env__)
+        if setjmp(err_env__) ~= 0 then
+            local #|err_args|# = #|state|#.err_args
+            #|state|#.frame.err_env = old_env__
+            ## err_blk()
+        else
+            ## blk()
+            #|state|#.frame.err_env = old_env__
+        end
+    until 0
+## end

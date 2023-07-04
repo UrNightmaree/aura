@@ -1,0 +1,53 @@
+##[[
+if STATIC_LINENOISE or STATIC_ALL then
+    cflags "-Ideps/linenoise deps/linenoise/linenoise.c"
+else
+    linklib "linenoise"
+end
+cinclude "<linenoise.h>"
+]]
+
+global linenoiseEditMore: cstring <cimport,nodecl>
+global linenoiseState: type <cimport,nodecl,ctypedef> = @record{
+  in_completion: cint,
+  completion_idx: csize,
+  ifd: cint,
+  ofd: cint,
+  buf: cstring,
+  buflen: csize,
+  prompt: cstring,
+  plen: csize,
+  pos: csize,
+  oldpos: csize,
+  len: csize,
+  cols: csize,
+  oldrows: csize,
+  history_index: cint
+}
+global linenoiseCompletions: type <cimport,nodecl> = @record{
+  len: csize,
+  cvec: *cstring
+}
+global function linenoiseEditStart(l: *linenoiseState, stdin_fd: cint, stdout_fd: cint, buf: cstring, buflen: csize, prompt: cstring): cint <cimport,nodecl> end
+global function linenoiseEditFeed(l: *linenoiseState): cstring <cimport,nodecl> end
+global function linenoiseEditStop(l: *linenoiseState): void <cimport,nodecl> end
+global function linenoiseHide(l: *linenoiseState): void <cimport,nodecl> end
+global function linenoiseShow(l: *linenoiseState): void <cimport,nodecl> end
+global function linenoise(prompt: cstring): cstring <cimport,nodecl> end
+global function linenoiseFree(ptr: pointer): void <cimport,nodecl> end
+global linenoiseCompletionCallback: type <cimport,nodecl> = @function(cstring, *linenoiseCompletions): void
+global linenoiseHintsCallback: type <cimport,nodecl> = @function(cstring, *cint, *cint): cstring
+global linenoiseFreeHintsCallback: type <cimport,nodecl> = @function(pointer): void
+global function linenoiseSetCompletionCallback(a1: function(cstring, *linenoiseCompletions): void): void <cimport,nodecl> end
+global function linenoiseSetHintsCallback(a1: function(cstring, *cint, *cint): cstring): void <cimport,nodecl> end
+global function linenoiseSetFreeHintsCallback(a1: function(pointer): void): void <cimport,nodecl> end
+global function linenoiseAddCompletion(a1: *linenoiseCompletions, a2: cstring): void <cimport,nodecl> end
+global function linenoiseHistoryAdd(line: cstring): cint <cimport,nodecl> end
+global function linenoiseHistorySetMaxLen(len: cint): cint <cimport,nodecl> end
+global function linenoiseHistorySave(filename: cstring): cint <cimport,nodecl> end
+global function linenoiseHistoryLoad(filename: cstring): cint <cimport,nodecl> end
+global function linenoiseClearScreen(): void <cimport,nodecl> end
+global function linenoiseSetMultiLine(ml: cint): void <cimport,nodecl> end
+global function linenoisePrintKeyCodes(): void <cimport,nodecl> end
+global function linenoiseMaskModeEnable(): void <cimport,nodecl> end
+global function linenoiseMaskModeDisable(): void <cimport,nodecl> end

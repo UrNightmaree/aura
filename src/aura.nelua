@@ -1,6 +1,47 @@
 require "arg"
-require "extra.aria"
+require "io"
+require "os"
+require "3rd.aria"
+require "3rd.linenoise"
 
 local state = ar_new_state(nilptr, nilptr)
+if not state then
+    io.stderr:write("out of memory!\n")
+    os.exit(false)
+end
 
-if #arg < 1 then
+defer
+    ar_close_state(state)
+    os.exit(true)
+end
+
+local v: *ar_Value
+local last: **ar_Value = &v
+for _, argv in ipairs(arg) do
+    last = ar_append_tail(state, last, ar_new_string(state, argv))
+end
+ar_bind_global(state, "argv", v)
+ar_bind_global(state, "prog-name", ar_new_string(state, arg[0]))
+
+print(
+"      __ _ _   _ _ __ __ _  \
+     / _` | | | | '__/ _` |  \
+    | (_| | |_| | | | (_| |  \
+     \\__,_|\\__,_|_|  \\__,_|")
+print()
+print("Welcome to \27[32mAura\27[0m")
+print("Aura "..AR_VERSION)
+
+linenoiseHistoryLoad(os.getenv("HOME").."/.aura_history")
+
+local line = linenoise("repl> ")
+while line do
+    linenoiseHistoryAdd(line)
+    linenoiseHistorySave(os.getenv("HOME").."/.aura_history")
+    ## ar_try("state", "err", function()
+        print(ar_to_string(state, ar_car(err)))
+    ## end, function()
+        print(ar_to_stringl(state, ar_do_string(state, line)))
+    ## end)
+    line = linenoise("repl> ")
+end

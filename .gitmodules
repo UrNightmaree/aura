@@ -1,0 +1,6 @@
+[submodule "deps/aria"]
+	path = deps/aria
+	url = https://github.com/rxi/aria
+[submodule "deps/linenoise"]
+	path = deps/linenoise
+	url = https://github.com/antirez/linenoise
