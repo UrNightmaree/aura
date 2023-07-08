@@ -1,0 +1,8 @@
+require "iterators"
+require "string"
+require "3rd.cargs"
+
+global cag_utils = @record{}
+
+function cag_utils.advanced_print(options: span(cag_option), size: integer)
+end

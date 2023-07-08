@@ -1,0 +1,38 @@
+##[[
+if STATIC_CARGS or STATIC_ALL then
+    cflags "-Ideps/cargs/include deps/cargs/src/cargs.c"
+else
+    linklib "cargs"
+end
+cinclude "<cargs.h>"
+]]
+
+require "C.stdio"
+
+global cag_option: type <cimport,nodecl> = @record{
+  identifier: cchar,
+  access_letters: cstring,
+  access_name: cstring,
+  value_name: cstring,
+  description: cstring
+}
+global cag_option_context: type <cimport,nodecl> = @record{
+  options: *cag_option,
+  option_count: csize,
+  argc: cint,
+  argv: *cstring,
+  index: cint,
+  inner_index: cint,
+  forced_end: boolean,
+  identifier: cchar,
+  value: cstring
+}
+global function cag_option_print(options: *cag_option, option_count: csize, destination: *C.FILE): void <cimport,nodecl> end
+global function cag_option_prepare(context: *cag_option_context, options: *[0]cag_option, option_count: csize, argc: cint, argv: *cstring): void <cimport,nodecl> end
+global function cag_option_fetch(context: *cag_option_context): boolean <cimport,nodecl> end
+global function cag_option_get(context: *cag_option_context): cchar <cimport,nodecl> end
+global function cag_option_get_value(context: *cag_option_context): cstring <cimport,nodecl> end
+global function cag_option_get_index(context: *cag_option_context): cint <cimport,nodecl> end
+
+-- macro
+global function CAG_ARRAY_SIZE(arr: *[0]cag_option): csize <cimport,nodecl> end

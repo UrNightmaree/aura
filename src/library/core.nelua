@@ -1,0 +1,154 @@
+require "io"
+require "C.string"
+require "3rd.aria"
+
+global core_lib = @record{}
+
+## local function binop(a, b, op)
+    in #[aster.BinaryOp{aster.value(a), op, aster.value(b)}]#
+## end
+
+## local function make_opcomp(name, op)
+    function core_lib.#|"comp_"..name|#(state: *ar_State, args: *ar_Value, env: *ar_Value): *ar_Value
+        local v = ar_new_number(state, binop!(
+            ar_check_number(state, ar_eval(state, ar_car(args), env)),
+            ar_check_number(state, ar_nth(args, 1) or ar_new_number(state, 1)),
+            #[name]#)
+        )
+        ar_set(state, ar_car(args), v, env)
+        return v
+    end
+## end
+
+## local function make_cr(name)
+    function core_lib.#|"c"..name.."r"|#(state: *ar_State, args: *ar_Value)
+        local v: *ar_Value = ar_car(args)
+        ## for s in name:gmatch(".") do
+            v = #|"ar_c"..s.."r"|#(v)
+        ## end
+        return v
+    end
+## end
+
+local function is_equal(v1: *ar_Value, v2: *ar_Value): boolean
+    if v1 == v2 then return true end
+    local vt1, vt2 = ar_type(v1), ar_type(v2)
+    if vt1 ~= vt2 then return false end
+    return
+        (vt1 == AR_TNUMBER) and v1.u.num.n == v2.u.num.n or
+        (vt1 == AR_TSYMBOL or vt1 == AR_TSTRING) and ((v1.u.str.len == v2.u.str.len) or
+                                                      (v1.u.str.s == v2.u.str.s)) or
+    false
+end
+
+function core_lib.when(state: *ar_State, args: *ar_Value, env: *ar_Value): *ar_Value
+    local cond: *ar_Value, v: *ar_Value = nilptr, args
+    local last_v: *ar_Value
+    while v do
+        cond = ar_eval(state, ar_car(args), env)
+        if not cond then
+            return cond
+        end
+        last_v = ar_car(v)
+        v = ar_cdr(v)
+    end
+    return last_v or cond
+end
+
+function core_lib.unless(state: *ar_State, args: *ar_Value, env: *ar_Value): *ar_Value
+    local cond: *ar_Value, nxt: *ar_Value, v: *ar_Value = nilptr, nilptr, args
+    local last_v: *ar_Value
+    while v do
+        cond = ar_eval(state, ar_car(args), env)
+        last_v = ar_car(v)
+        if cond then
+            return cond
+        end
+        v = ar_cdr(v)
+    end
+    return last_v or cond
+end
+
+## make_opcomp("add", "+")
+## make_opcomp("sub", "-")
+## make_opcomp("mul", "*")
+## make_opcomp("div", "/")
+## make_opcomp("idiv", "//")
+## make_opcomp("pow", "^")
+
+function core_lib.equal(state: *ar_State, args: *ar_Value): *ar_Value
+    return is_equal(ar_car(args), ar_nth(args, 1)) and state.t or nilptr
+end
+
+function core_lib.isnt(state: *ar_State, args: *ar_Value): *ar_Value
+    return not is_equal(ar_car(args), ar_nth(args, 1)) and state.t or nilptr
+end
+
+function core_lib.notv(state: *ar_State, args: *ar_Value): *ar_Value
+    return ar_type(ar_car(args)) == AR_TNIL and state.t or nilptr
+end
+
+function core_lib.ternary(state: *ar_State, args: *ar_Value): *ar_Value
+    return ar_car(args) and ar_nth(args, 1) or ar_nth(args, 2)
+end
+
+## make_cr("aa")
+## make_cr("ad")
+## make_cr("dd")
+## make_cr("da")
+
+function core_lib.prints(state: *ar_State, args: *ar_Value): *ar_Value
+    local output = ""
+    local last_val: *ar_Value
+    while args do
+        output = output..ar_to_string(state, ar_car(args)).."\t"
+        last_val = ar_car(args)
+        args = ar_cdr(args)
+    end
+    io.write(output)
+    return last_val
+end
+
+
+
+local core_prim: []record{
+    name: string,
+    prim: ar_Prim
+} = {
+    { "when", core_lib.when },
+    { "unless", core_lib.unless },
+    { "++", core_lib.comp_add },
+    { "+=", core_lib.comp_add },
+    { "--", core_lib.comp_sub },
+    { "-=", core_lib.comp_sub },
+    { "*=", core_lib.comp_mul },
+    { "/=", core_lib.comp_div },
+    { "//=", core_lib.comp_idiv },
+    { "^=", core_lib.comp_pow }
+}
+
+local core_funcs: []record{
+    name: string,
+    fn: ar_CFunc
+} = {
+    { "==", core_lib.equal },
+    { "isnt", core_lib.isnt },
+    { "~=", core_lib.isnt},
+    { "not", core_lib.notv },
+    { "ternary", core_lib.ternary },
+    { "?:", core_lib.ternary },
+    { "caar", core_lib.caar },
+    { "cadr", core_lib.cadr },
+    { "cddr", core_lib.cddr },
+    { "cdar", core_lib.cdar },
+    { "prints", core_lib.prints },
+}
+
+function core_lib.register(state: *ar_State): void
+    for _, v in pairs(core_prim) do
+        ar_bind_global(state, v.name, ar_new_prim(state, v.prim))
+    end
+    for _, v in pairs(core_funcs) do
+        ar_bind_global(state, v.name, ar_new_cfunc(state, v.fn))
+    end
+end

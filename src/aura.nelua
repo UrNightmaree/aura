@@ -1,47 +1,168 @@
 require "arg"
 require "io"
 require "os"
+require "string"
+
+require "C.arg"
+require "C.stdio"
+require "C.stdlib"
+
 require "3rd.aria"
 require "3rd.linenoise"
+require "3rd.cargs"
+require "misc.version"
+require "library"
 
-local state = ar_new_state(nilptr, nilptr)
-if not state then
-    io.stderr:write("out of memory!\n")
-    os.exit(false)
+## local function make_enumopt(id)
+    local #|"CLIOPT_"..id:upper()|# <comptime> = #[id:byte()]#
+## end
+
+local function to_integer(b: boolean): integer
+    return b and 1 or 0
 end
 
-defer
-    ar_close_state(state)
-    os.exit(true)
+local cli_options: [2]cag_option = {
+    { identifier = 'i'_cchar,
+      access_letters = "i",
+      access_name = "interactive",
+      description = "Start in interactive REPL mode" },
+
+    { identifier = 'h'_cchar,
+      access_letters = "h",
+      access_name = "help",
+      description = "Shows the command usage" },
+}
+
+C.qsort(&cli_options, #cli_options, #(@cag_option), function(a: pointer, b: pointer)
+    local opt1 = $(@*cag_option)(a)
+    local opt2 = $(@*cag_option)(b)
+
+    local result: cint =
+        to_integer(#opt1.access_name < #opt2.access_name) -
+        to_integer(#opt1.access_name > #opt2.access_name)
+
+    return result
+end)
+
+local function usage(
+    err: facultative(string),
+    exit_code: overload(integer, boolean, niltype)
+)
+    print(("Usage: %s [option] [script [--] [args...]]"):format(arg[0]))
+    
+##  if not err.type.is_niltype then
+        print(("\nError: %s"):format(err))
+        os.exit(#[not exit_code.type.is_niltype and exit_code or false]#)
+##  else
+        print(("%s, an Aria runtime.\n"):format(version.version))
+        print("Options:")
+
+        local last_len = 0
+        for i, v in ipairs(cli_options) do
+            local access_letters: string, access_name: string, description: string, value_name =
+                v.access_letters, v.access_name, v.description, v.value_name
+            if not v.value_name then
+                local output = ("%s%s"):format(
+                    access_letters and "-"..access_letters..", " or "",
+                    access_name and "--"..access_name or "")
+                last_len = #output > last_len and #output or last_len
+                io.write("    "..output.."  ")
+                print((" "):rep(last_len - #output)..(description or ""))
+            end
+        end
+    
+        last_len = 0
+        for i, v in pairs(cli_options) do
+            local access_letters: string, access_name: string, description: string, value_name =
+                v.access_letters, v.access_name, v.description, v.value_name
+             if v.value_name then
+                local output = ("%s%s"):format(
+                    access_letters and "-"..access_letters..", " or "",
+                    access_name and "--"..access_name or "")
+                last_len = #output > last_len and #output or last_len
+                io.write("    "..output.."  ")
+                print((" "):rep(last_len - #output)..(description or ""))
+            end
+       end
+        os.exit(#[not exit_code.type.is_niltype and exit_code or true]#)
+##  end
 end
 
-local v: *ar_Value
-local last: **ar_Value = &v
-for _, argv in ipairs(arg) do
-    last = ar_append_tail(state, last, ar_new_string(state, argv))
-end
-ar_bind_global(state, "argv", v)
-ar_bind_global(state, "prog-name", ar_new_string(state, arg[0]))
+local cli_config = @record{
+    interactive: boolean
+}
 
-print(
-"      __ _ _   _ _ __ __ _  \
-     / _` | | | | '__/ _` |  \
-    | (_| | |_| | | | (_| |  \
-     \\__,_|\\__,_|_|  \\__,_|")
-print()
-print("Welcome to \27[32mAura\27[0m")
-print("Aura "..AR_VERSION)
+## make_enumopt("i")
+## make_enumopt("h")
 
-linenoiseHistoryLoad(os.getenv("HOME").."/.aura_history")
+do --[[ MAIN ]]--
+    local context: cag_option_context
+    local config: cli_config = {false}
+    local opts_size = #cli_options
 
-local line = linenoise("repl> ")
-while line do
-    linenoiseHistoryAdd(line)
-    linenoiseHistorySave(os.getenv("HOME").."/.aura_history")
-    ## ar_try("state", "err", function()
-        print(ar_to_string(state, ar_car(err)))
-    ## end, function()
-        print(ar_to_stringl(state, ar_do_string(state, line)))
-    ## end)
-    line = linenoise("repl> ")
+    cag_option_prepare(&context, cli_options, opts_size, C.argc, C.argv)
+    while cag_option_fetch(&context) do
+        local ident = cag_option_get(&context)
+        switch (@byte)(ident) do
+        case CLIOPT_I then
+            config.interactive = true
+        case CLIOPT_H then
+            usage()
+        else
+            local invalid_opt =
+                arg[context.index-1]:match("^%-") and
+                arg[context.index-1] or arg[context.index]
+
+            usage(("invalid option '%s' in '%s'!"):format(
+                invalid_opt:gsub("=.*$",""),
+                invalid_opt
+            ))
+        end
+    end
+
+    local state = ar_new_state(nilptr, nilptr)
+    if not state then
+        io.stderr:write("out of memory!\n")
+        os.exit(false)
+    end
+
+    defer
+        ar_close_state(state)
+        os.exit(true)
+    end
+    lib.register(state)
+
+    local v: *ar_Value
+    local last: **ar_Value = &v
+    for _, argv in ipairs(arg) do
+        last = ar_append_tail(state, last, ar_new_string(state, argv))
+    end
+    ar_bind_global(state, "argv", v)
+    ar_bind_global(state, "prog-name", ar_new_string(state, arg[0]))
+    
+    if config.interactive then
+        print("\
+              __ _ _   _ _ __ __ _  \
+             / _` | | | | '__/ _` |  \
+            | (_| | |_| | | | (_| |  \
+             \\__,_|\\__,_|_|  \\__,_|"
+        )
+        print()
+        print("Welcome to \27[32mAura\27[0m")
+        print("Aria "..AR_VERSION)
+    
+        linenoiseHistoryLoad(os.getenv("HOME").."/.aura_history")
+
+        local line = linenoise("repl> ")
+        while line do
+            linenoiseHistoryAdd(line)
+            linenoiseHistorySave(os.getenv("HOME").."/.aura_history")
+            ## ar_try("state", "err", function()
+                print(ar_to_string(state, ar_car(err)))
+            ## end, function()
+                print(ar_to_stringl(state, ar_do_string(state, line)))
+            ## end)
+            line = linenoise("repl> ")
+        end
+    end
 end

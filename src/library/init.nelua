@@ -1,0 +1,19 @@
+require "3rd.aria"
+
+global lib = @record{}
+
+## local lfs = require("lfs")
+## for p in lfs.dir("src/library") do
+    ## if p ~= "." and p ~= ".." and p ~= "init.nelua" then
+        require(#["library."..p:gsub("%.nelua$", "")]#)
+        global lib.#|p:gsub("%.nelua$", "")|# = #|p:gsub("%.nelua$", "").."_lib"|#
+    ## end
+## end
+
+function lib.register(state: *ar_State)
+    ## for p in lfs.dir("src/library") do
+        ## if p ~= "." and p ~= ".." and p ~= "init.nelua" then
+            lib.#|p:gsub("%.nelua$", "")|#.register(state)
+        ## end
+    ## end
+end

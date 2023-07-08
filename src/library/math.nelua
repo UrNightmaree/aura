@@ -1,0 +1,36 @@
+require "3rd.aria"
+
+global math_lib = @record{}
+
+function math_lib.idiv(state: *ar_State, args: *ar_Value)
+    local res = ar_check_number(state, ar_car(args))
+    while args do
+        args = ar_cdr(args)
+        res = res // ar_check_number(state, ar_car(args))
+    end
+    return ar_new_number(state, res)
+end
+
+function math_lib.pow(state: *ar_State, args: *ar_Value)
+    local res = ar_check_number(state, ar_car(args))
+    while args do
+        args = ar_cdr(args)
+        if not args then break end
+        res = res ^ ar_check_number(state, ar_car(args))
+    end
+    return ar_new_number(state, res)
+end
+
+local math_funcs: []record{
+    name: string,
+    fn: ar_CFunc
+} = {
+    { "//", math_lib.idiv },
+    { "^", math_lib.pow }
+}
+
+function math_lib.register(state: *ar_State)
+    for _, v in pairs(math_funcs) do
+        ar_bind_global(state, v.name, ar_new_cfunc(state, v.fn))
+    end
+end

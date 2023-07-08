@@ -153,7 +153,7 @@ global function ar_do_file(S: *ar_State, filename: cstring): *ar_Value <cimport,
 global AR_VERSION: cstring <cimport,nodecl>
 global function ar_get_global(S: *ar_State, x: *ar_Value): *ar_Value <cimport,nodecl> end
 global function ar_bind_global(S: *ar_State, x: cstring, v: *ar_Value): *ar_Value <cimport,nodecl> end
-global function ar_call_global(S: *ar_State, f: *ar_Value, a: *ar_Value): *ar_Value <cimport,nodecl> end
+global function ar_call_global(S: *ar_State, f: cstring, a: *ar_Value): *ar_Value <cimport,nodecl> end
 global function ar_check_string(S: *ar_State, v: *ar_Value): cstring <cimport,nodecl> end
 global function ar_check_udata(S: *ar_State, v: *ar_Value): *void <cimport,nodecl> end
 global function ar_check_number(S: *ar_State, v: *ar_Value): float64 <cimport,nodecl>end

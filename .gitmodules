@@ -4,3 +4,6 @@
 [submodule "deps/linenoise"]
 	path = deps/linenoise
 	url = https://github.com/antirez/linenoise
+[submodule "deps/cargs"]
+	path = deps/cargs
+	url = https://github.com/likle/cargs

@@ -1,0 +1,83 @@
+require "string"
+
+##[[
+local fs = require("nelua.utils.fs")
+local tabler = require("nelua.utils.tabler")
+local executor = require("nelua.utils.executor")
+
+-- from nelua-lang/lualib/nelua/version.lua
+local function execute_git_command(args)
+    if config.release then return end
+    local gitdir = fs.abspath(fs.join(fs.dirname(fs.scriptname(), 3), '.git'))
+    if fs.isdir(gitdir) then
+        local execargs = tabler.insertvalues({'--git-dir', gitdir}, args)
+        local stdout = executor.evalex('git', execargs)
+        if stdout and stdout ~= '' then
+            return stdout
+        end
+    end
+end
+]]
+
+global version = @record{}
+
+global version.major <comptime> = 0
+global version.minor <comptime> = 1
+global version.patch <comptime> = 0
+global version.suffix <comptime> = "-dev"
+global version.version = ("aura %d.%d.%d%s"):format(
+                                    version.major, version.minor,
+                                    version.patch, version.suffix)
+
+global version.git_build = #[(function()
+    local stdout = execute_git_command{"rev-parse", "HEAD", "--count"}
+    local res = 0
+    if stdout then
+        local build = tonumber(stdout)
+        if build then
+            res = build
+        end
+    end
+    return res
+end)()]#
+
+global version.git_date = #[(function()
+    local stdout = execute_git_command{"log", "-1", "--format=%ci"}
+    local res = "unknown"
+    if stdout then
+        local date = stdout:match("[^\r\n]+")
+        if date then
+            res = date
+        end
+    end
+    return res
+end)()]#
+
+global version.git_hash = #[(function()
+    local stdout = execute_git_command{"rev-parse", "HEAD"}
+    local res = "unknown"
+    if stdout then
+        local hash = stdout:match("%w+")
+        if hash then
+            res = hash
+        end
+    end
+    return res
+end)()]#
+
+global version.semver = (function()
+    local major, minor, patch, suffix =
+        version.major, version.minor, version.patch, version.suffix
+
+    local semver = ("%d.%d.%d%s"):format(major, minor, patch, suffix)
+    if suffix == "-dev" then
+        local build, hash = version.git_build, version.git_hash
+        if build then
+            semver = semver.."."..build
+        end
+        if hash then
+            semver = semver.."+"..hash:sub(1, 8)
+        end
+    end
+    return semver
+end)()
